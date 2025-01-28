@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team Members</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #333;
+      color: #fff;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: red;
+    }
+
+    .card-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    .card {
+      background-color: #444;
+      border-radius: 10px;
+      padding: 10px;
+      width: 200px;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
+      text-align: center;
+      color: #fff;
+    }
+
+    .card img {
+      border-radius: 50%;
+      width: 70px;
+      height: 70px;
+      margin-bottom: 10px;
+    }
+
+    .card-header {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .card-body {
+      font-size: 14px;
+    }
+
+    .card-status {
+      font-weight: bold;
+      color: #ff3333;
+    }
+
+    .card-bio {
+      font-style: italic;
+      color: #bbb;
+    }
+
+    .card-footer {
+      font-size: 12px;
+      color: #777;
+    }
+
+    .error {
+      color: red;
+      text-align: center;
+    }
+
+    select,
+    button {
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 16px;
+      background-color: #333;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+
+    select,
+    button:hover {
+      background-color: #555;
+    }
+
+    .action-btns {
+      margin-top: 10px;
+    }
+
+    .role {
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    .search-bar {
+      padding: 10px;
+      width: 100%;
+      margin-bottom: 20px;
+      background-color: #444;
+      color: #fff;
+      border: none;
+      font-size: 16px;
+    }
+
+    .search-bar::placeholder {
+      color: #bbb;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Team Members</h1>
+
+    <form action="/team" method="post">
+      <label for="guild_id">Select Server:</label>
+      <select name="guild_id" id="guild_id">
+        <option value="">--Select Server--</option>
+        {% for guild in guilds %}
+        <option value="{{ guild.id }}">{{ guild.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Fetch Members</button>
+    </form>
+
+    <form action="/team" method="post">
+      <input type="text" id="search" name="search_query" class="search-bar" placeholder="Search members by name..."
+        value="{{ request.form.get('search_query', '') }}">
+      <button type="submit">Search</button>
+    </form>
+
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+
+    {% if members %}
+    <h2>Server: <a href="https://discord.gg/{{ guild_id }}" target="_blank">{{ guild_name }}</a></h2>
+    <button onclick="window.location.href='/leave/{{ guild_id }}'">Leave Server</button>
+
+    <div class="card-group">
+      {% for member in members %}
+      <div class="card">
+        <img src="{{ member.avatar_url }}" alt="{{ member.name }} Avatar">
+        <div class="card-header">{{ member.name }}#{{ member.discriminator }}</div>
+        <div class="card-body">
+          <p><strong>Bot:</strong> {{ 'Yes' if member.is_bot else 'No' }}</p>
+          <p><strong>Administrator:</strong> {{ 'Yes' if member.is_admin else 'No' }}</p>
+          <p class="card-status"><strong>Status:</strong> {{ member.status }}</p>
+
+          <!-- Displaying how many roles -->
+          <p class="role"><strong>Roles:</strong>
+            {% for role in member.roles[:50] %}
+            <span>{{ role.name }}</span>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </p>
+
+          {% if member.banner_url %}
+          <p><strong>Banner:</strong><br><img src="{{ member.banner_url }}" alt="Banner"
+              style="width: 100%; border-radius: 10px; margin-top: 10px;"></p>
+          {% endif %}
+          {% if member.bio %}
+          <p class="card-bio"><strong>Bio:</strong> {{ member.bio }}</p>
+          {% else %}
+          <p class="card-bio">No biography available.</p>
+          {% endif %}
+        </div>
+        <div class="action-btns">
+          <button
+            onclick="event.preventDefault(); document.getElementById('kick-form-{{ member.id }}').submit();">Kick</button>
+          <form id="kick-form-{{ member.id }}" action="/kick/{{ member.id }}" method="post" style="display: none;">
+            <input type="hidden" name="guild_id" value="{{ guild_id }}">
+          </form>
+
+          <button
+            onclick="event.preventDefault(); document.getElementById('ban-form-{{ member.id }}').submit();">Ban</button>
+          <form id="ban-form-{{ member.id }}" action="/ban/{{ member.id }}" method="post" style="display: none;">
+            <input type="hidden" name="guild_id" value="{{ guild_id }}">
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p>No team members found.</p>
+    {% endif %}
+  </div>
+</body>
+
+</html>

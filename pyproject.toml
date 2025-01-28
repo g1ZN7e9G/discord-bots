@@ -1,0 +1,19 @@
+[project]
+name = "discord-bots"
+version = "0.1.0"
+description = ""
+authors = [
+  { name = "g1ZN7e9G", email = "64645748+g1ZN7e9G@users.noreply.github.com" },
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "discord (>=2.3.2,<3.0.0)",
+  "flask (>=3.1.0,<4.0.0)",
+  "audioop-lts (>=0.2.1,<0.3.0)",
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
