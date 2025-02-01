@@ -122,12 +122,12 @@
   <div class="container">
     <h1>Team Members</h1>
 
-    <form action="/team" method="post">
+    <form action="/team" method="get">
       <label for="guild_id">Select Server:</label>
       <select name="guild_id" id="guild_id">
         <option value="">--Select Server--</option>
         {% for guild in guilds %}
-        <option value="{{ guild.id }}">{{ guild.name }}</option>
+        <option value="{{ guild.id }}" {% if guild.id==guild_id %}selected{% endif %}>{{ guild.name }}</option>
         {% endfor %}
       </select>
       <button type="submit">Fetch Members</button>
@@ -177,14 +177,16 @@
         <div class="action-btns">
           <button
             onclick="event.preventDefault(); document.getElementById('kick-form-{{ member.id }}').submit();">Kick</button>
-          <form id="kick-form-{{ member.id }}" action="/kick/{{ member.id }}" method="post" style="display: none;">
-            <input type="hidden" name="guild_id" value="{{ guild_id }}">
+          <form id="kick-form-{{ member.id }}" action="/kick" method="post" style="display: none;">
+            <input type="hidden" name="guild_id" value="{{ guild_id }}" />
+            <input type="hidden" name="member_id" value="{{ member.id }}" />
           </form>
 
           <button
             onclick="event.preventDefault(); document.getElementById('ban-form-{{ member.id }}').submit();">Ban</button>
-          <form id="ban-form-{{ member.id }}" action="/ban/{{ member.id }}" method="post" style="display: none;">
+          <form id="ban-form-{{ member.id }}" action="/ban" method="post" style="display: none;">
             <input type="hidden" name="guild_id" value="{{ guild_id }}">
+            <input type="hidden" name="member_id" value="{{ member.id }}" />
           </form>
         </div>
       </div>
