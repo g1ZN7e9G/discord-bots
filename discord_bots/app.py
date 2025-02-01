@@ -128,56 +128,39 @@ def team_page():
     )
 
 
-@bp.route("/kick", methods=["POST"])
-def kick_member():
-    guild_id = request.form.get("guild_id")
-    member_id = request.form.get("member_id")
-
-    try:
-        member = get_member(guild_id, member_id)
-        future = asyncio.run_coroutine_threadsafe(kick_member_async(member), loop)
-        future.result(10)
-        if session.get("url"):
-            return redirect(session.pop("url", None))
-        else:
-            return "Successfully kicked user..."
-
-    except discord.Forbidden as e:
-        session["error"] = f"This was not allowed, {e}"
-        return fail_route(session, 403)
-
-    except BotException as e:
-        session["error"] = e.value()
-        return fail_route(session, 404)
-
-    except ValueError:
-        return "Invalid Guild ID format.", 400
-
-
 @bp.route("/ban", methods=["POST"])
-def ban_member():
+@bp.route("/kick", methods=["POST"])
+def manage_member():
     guild_id = request.form.get("guild_id")
     member_id = request.form.get("member_id")
+    print(request.url_rule)
+    rule = "/kick"
+    if request.url_rule:
+        rule = str(request.url_rule)
+    action_dict = {
+        "/kick": kick_member_async,
+        "/ban": ban_member_async,
+    }
 
     try:
         member = get_member(guild_id, member_id)
-        future = asyncio.run_coroutine_threadsafe(ban_member_async(member), loop)
-        future.result(10)
+        future = asyncio.run_coroutine_threadsafe(action_dict[rule](member), loop)
+        user_action = future.result(10)
         if session.get("url"):
             return redirect(session.pop("url", None))
         else:
-            return "Successfully banned user..."
+            return f"Successfully {user_action} user..."
 
     except discord.Forbidden as e:
-        session["error"] = f"This was not allowed, {e}"
+        session["error"] = f"Failed to {e.text}"
         return fail_route(session, 403)
-
-    except ValueError:
-        return "Invalid Guild ID format.", 400
 
     except BotException as e:
         session["error"] = e.value()
         return fail_route(session, 404)
+
+    except ValueError:
+        return "Invalid Guild ID format.", 400
 
 
 @bp.route("/leave/<int:guild_id>")
@@ -198,15 +181,17 @@ def leave_server(guild_id: int):
 async def kick_member_async(member: Member):
     try:
         await member.kick(reason="Requested by bot.")
-    except discord.Forbidden:
-        raise
+        return "Kicked"
+    except discord.Forbidden as e:
+        raise discord.Forbidden(e.response, f"Kick: {e.text}")    
 
 
 async def ban_member_async(member: Member):
     try:
         await member.ban(reason="Requested by bot.")
-    except discord.Forbidden:
-        raise
+        return "Banned"
+    except discord.Forbidden as e:
+        raise discord.Forbidden(e.response, f"Ban: {e.text}")
 
 
 @bot.event
@@ -244,7 +229,6 @@ def fail_route(session: SessionMixin, code: int):
 
 def run_flask(app: Flask):
     return app.run(debug=True, use_reloader=False, host="0.0.0.0", port=5000)
-
 
 
 def run_bot_loop():
