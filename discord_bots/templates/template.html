@@ -133,14 +133,15 @@
       <button type="submit">Fetch Members</button>
     </form>
 
-    <form action="/team" method="post">
-      <input type="text" id="search" name="search_query" class="search-bar" placeholder="Search members by name..."
-        value="{{ request.form.get('search_query', '') }}">
+    <form action="/team" method="get">
+      <input type="text" id="search" name="search_query" class="search-bar" placeholder="Search members by name..." {%
+        if request.args.get('search_query') %} value="{{ request.args.get('search_query')}}" {% endif %} />
+      <input type="hidden" name="guild_id" value="{{ guild_id }}" />
       <button type="submit">Search</button>
     </form>
 
-    {% if error %}
-    <p class="error">{{ error }}</p>
+    {% if session.get("error") %}
+    <p class="error">{{ session.pop("error") }}</p>
     {% endif %}
 
     {% if members %}
@@ -151,7 +152,7 @@
       {% for member in members %}
       <div class="card">
         <img src="{{ member.avatar_url }}" alt="{{ member.name }} Avatar">
-        <div class="card-header">{{ member.name }}#{{ member.discriminator }}</div>
+        <div class="card-header">{{ member.name }}</div>
         <div class="card-body">
           <p><strong>Bot:</strong> {{ 'Yes' if member.is_bot else 'No' }}</p>
           <p><strong>Administrator:</strong> {{ 'Yes' if member.is_admin else 'No' }}</p>

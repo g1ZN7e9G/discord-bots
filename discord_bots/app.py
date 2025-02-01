@@ -2,6 +2,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from enum import Enum
+import os
 from pathlib import Path
 from threading import Thread
 
@@ -24,12 +25,15 @@ from definitions import SECRETS_PATH
 intents = discord.Intents.default()
 intents.members = True
 intents.presences = True
+intents.message_content = False
 bp = Blueprint("app", __name__, template_folder="templates")
 bot = commands.Bot(command_prefix="!", intents=intents)
-loop = asyncio.new_event_loop()
+bot.shard_id = os.getpid()
 logging.basicConfig(level=logging.INFO)
-
 guilds = []
+
+loop = asyncio.new_event_loop()
+
 
 flag_to_badge_dict = {
     UserFlags.hypesquad_balance: "https://discordresources.com/img/hypesquadbalance.svg",
@@ -63,7 +67,8 @@ def home():
     guilds = bot.guilds
     session["url"] = request.url
     return render_template_string(
-        HTML_TEMPLATE, guilds=guilds, error=session.pop("error", None)
+        HTML_TEMPLATE,
+        guilds=guilds,
     )
 
 
@@ -72,6 +77,9 @@ def team_page():
     guilds = bot.guilds
     members: list[dict[str, str | bool | int | Sequence[Role | str] | None]] = []
     guild_id = request.args.get("guild_id")
+    search_query = request.args.get("search_query")
+    if search_query is not None and len(search_query) < 1:
+        return redirect(url_for("app.team_page", guild_id=guild_id))
     if not guild_id:
         session["error"] = ExceptionType.NoGuild.value
         return fail_route(session, 404)
@@ -80,6 +88,9 @@ def team_page():
         session["error"] = ExceptionType.BadGuild.value
         return fail_route(session, 404)
     for member in guild.members:
+        if search_query:
+            if search_query.lower() not in member.name.lower():
+                continue
         banner_url = None
         bio = None
         try:
@@ -90,13 +101,10 @@ def team_page():
 
         members.append(
             {
-                "name": member.name,
-                "discriminator": member.discriminator,
+                "name": str(member),
                 "is_bot": member.bot,
                 "is_admin": member.guild_permissions.administrator,
-                "avatar_url": str(member.avatar.url)
-                if member.avatar
-                else member.default_avatar.url,
+                "avatar_url": str(member.display_avatar.url),
                 "status": str(member.status).capitalize(),
                 "banner_url": banner_url,
                 "bio": str(bio),
@@ -108,10 +116,11 @@ def team_page():
                 ],
             }
         )
+
     session["url"] = request.url
+
     return render_template_string(
         HTML_TEMPLATE,
-        error=session.pop("error", None),
         members=members,
         guilds=guilds,
         guild_name=guild.name,
@@ -135,7 +144,7 @@ def kick_member():
 
     except discord.Forbidden as e:
         session["error"] = f"This was not allowed, {e}"
-        return fail_route(session, 401)
+        return fail_route(session, 403)
 
     except BotException as e:
         session["error"] = e.value()
@@ -161,7 +170,7 @@ def ban_member():
 
     except discord.Forbidden as e:
         session["error"] = f"This was not allowed, {e}"
-        return fail_route(session, 401)
+        return fail_route(session, 403)
 
     except ValueError:
         return "Invalid Guild ID format.", 400
@@ -174,14 +183,16 @@ def ban_member():
 @bp.route("/leave/<int:guild_id>")
 def leave_server(guild_id: int):
     guild = bot.get_guild(guild_id)
-    if guild:
-        try:
-            guild_leave = asyncio.run_coroutine_threadsafe(guild.leave(), loop)
-            guild_leave.result(10)
-            return redirect(url_for("home"))
-        except discord.Forbidden:
-            return "I don't have permission to leave this server.", 403
-    return "Guild not found.", 404
+    if not guild:
+        session["error"] = ExceptionType.BadGuild.value
+        return fail_route(session, 404)
+    try:
+        guild_leave = asyncio.run_coroutine_threadsafe(guild.leave(), loop)
+        guild_leave.result(10)
+        return redirect(url_for("app.home"))
+    except discord.Forbidden as e:
+        session["error"] = f"I don't have permission to leave this server, {e}"
+        return fail_route(session, 403)
 
 
 async def kick_member_async(member: Member):
@@ -200,7 +211,7 @@ async def ban_member_async(member: Member):
 
 @bot.event
 async def on_ready():
-    if bot.user is not None:
+    if bot.user:
         print(f"Bot logged in as {bot.user.name}")
 
 
@@ -235,11 +246,13 @@ def run_flask(app: Flask):
     return app.run(debug=True, use_reloader=False, host="0.0.0.0", port=5000)
 
 
+
 def run_bot_loop():
     asyncio.set_event_loop(loop)
     token = read_token_from_file(SECRETS_PATH / "discord_token")
     _ = loop.create_task(bot.start(token))
-    loop.run_forever()
+    _ = loop.run_forever()
+
 
 def read_token_from_file(path: Path):
     with open(path, "r") as file:
@@ -251,16 +264,11 @@ def create_app():
     app = Flask(__name__)
     app.secret_key = read_token_from_file(SECRETS_PATH / "flask_token")
     app.register_blueprint(bp)
-    async_thread = Thread(target=run_bot_loop, daemon=True)
-    async_thread.start()
+    loop_thread = Thread(target=run_bot_loop, daemon=True)
+    loop_thread.start()
     return app
-
-
 
 
 if __name__ == "__main__":
     print("Prefer flask run instead!")
-    flask_thread = Thread(target=run_flask, args=(create_app(),))
-    flask_thread.start()
-    flask_thread.join()
-    raise KeyboardInterrupt
+    run_flask(create_app())
